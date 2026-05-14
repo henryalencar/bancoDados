@@ -788,3 +788,260 @@ GROUP BY equipamento.nomeEquipamento
 HAVING COUNT(aluguelequipamento.idEquipamento) > 3;
 
 SELECT * FROM aluguelequipamento
+
+/* ATIVIDADE DE VIW E PROCEDURE*/
+
+/* 01) Criar uma view que traga a data do alugel, o nome do funcionário que alugou e o cliente*/
+
+CREATE VIEW vw_AluguelFuncionarioCliente AS
+SELECT 
+aluguel.dataHoraRetirada,
+cliente.nomeCliente,
+funcionario.nomeFuncionario
+FROM aluguel
+
+JOIN cliente
+ON aluguel.idCliente = cliente.idCliente
+
+JOIN funcionario
+ON aluguel.idFuncionario = funcionario.idFuncionario;
+
+SELECT * FROM vw_AluguelFuncionarioCliente; -- PRA VISUALAZAR
+
+
+
+
+/* 02) Criar uma procedure que traga todos os aluguéis de determinado dia. 
+Deve aparecer no aluguel a data do aluguel, o nome do cliente, o funcionário, e o equipamento alugado 
+de acordo com uma data passada como parâmetro */
+
+
+
+CREATE PROCEDURE ps_AluguelPorData
+(
+IN dataPesquisa DATE
+)
+
+SELECT 
+aluguel.dataHoraRetirada,
+cliente.nomeCliente,
+funcionario.nomeFuncionario,
+equipamento.nomeEquipamento
+
+FROM aluguel
+
+JOIN cliente
+ON aluguel.idCliente = cliente.idCliente
+
+JOIN funcionario
+ON aluguel.idFuncionario = funcionario.idFuncionario
+
+JOIN aluguelequipamento
+ON aluguel.idAluguel = aluguelequipamento.idAluguel
+
+JOIN equipamento
+ON aluguelequipamento.idEquipamento = equipamento.idEquipamento
+
+WHERE DATE(aluguel.dataHoraRetirada) = dataPesquisa;
+
+
+/* USANDO A PROCEDURE QUE FOI CRIADA */
+
+CALL ps_AluguelPorData('2024-12-27');
+
+
+/* 03) Criar uma procedure ou view para trazer a quantidade de aluguéis 
+realizadas separadas por forma de pagamento. É melhor usar procedure ou view? Justifique.
+Ex.:
+PIX       67
+CRÉDITO  177
+*/
+
+/*JUSTIFATIVA; PORUE VAMOS UTILIZAR PQ VAMOS CONSULTAR DADOS E NAO PREICA DOS PARAMENTROS, TBM DARIA PA USAR PROCEDURE*/
+
+CREATE VIEW vw_QtdAluguelFormaPagamento AS
+
+SELECT 
+formaPagamento,
+COUNT(idAluguel) AS 'qtdAlugueis'
+
+FROM aluguel
+WHERE formaPagamento IS NOT NULL
+GROUP BY formaPagamento;
+
+
+/* VISUALIZANDO A VIEW */  
+
+SELECT * FROM vw_qtdaluguelformapagamento; 
+
+
+
+/* 04) Criar uma procedure que permita reajustar em X percentual
+toda a tabela de equipamentos. */
+
+
+CREATE PROCEDURE ps_ReajusteEquipamento
+(
+IN percentual DECIMAL(5,2)
+)
+
+UPDATE equipamento
+SET valorHora = valorHora + (valorHora * percentual / 100);
+
+
+/* USANDO A PROCEDURE */
+
+/* VAI AUMENTAR 10%% */
+CALL ps_ReajusteEquipamento(10);
+
+/* VAI DAR DESCONTO DE 5% */
+CALL ps_ReajusteEquipamento(-5);
+
+
+/* VISUALIZAR  */
+
+SELECT * FROM equipamento;
+
+
+/* 05) Criar uma procedure ou view para trazer a quantidade de aluguéis 
+realizadas de acordo com a forma de pagamento informada. 
+É melhor usar procedure ou view? Justifique.
+*/
+
+/* JUSTIFCATIVA: É MELHOR PROCEDUREPQ PRECISA RECEBER UM PARAMETRO*/
+
+CREATE PROCEDURE ps_QtdAluguelFormaPagamento
+(
+IN formaPgto VARCHAR(50)
+)
+
+SELECT 
+formaPagamento,
+COUNT(idAluguel) AS 'qtdAlugueis'
+
+FROM aluguel
+WHERE formaPagamento = formaPgto
+GROUP BY formaPagamento;
+
+
+/* USANDO A PROCEDURE */
+
+CALL ps_QtdAluguelFormaPagamento('Pix');
+
+CALL ps_QtdAluguelFormaPagamento('Cartao');
+
+CALL ps_QtdAluguelFormaPagamento('Dinheiro');
+
+
+
+
+/*DESAFIO - Automatizar o processo de locação de um equipamento 
+atualizando o estoque e tudo que for necessário através de uma procedure
+de criar aluguel*/
+
+
+DELIMITER $$
+
+CREATE PROCEDURE ps_CriarAluguel
+(
+IN p_idCliente INT,
+IN p_idFuncionario INT,
+IN p_idEquipamento INT,
+IN p_qtd INT,
+IN p_formaPagamento VARCHAR(50)
+)
+
+BEGIN
+
+DECLARE v_valorUnitario DECIMAL(10,2);
+DECLARE v_valorTotal DECIMAL(10,2);
+DECLARE v_idAluguel INT;
+
+    
+/* BUSCA O VALOR DO EQUIPAMENTO */
+    
+SELECT valorHora
+INTO v_valorUnitario
+FROM equipamento
+WHERE idEquipamento = p_idEquipamento;
+
+    
+/* CALCULA O VALOR TOTAL */
+    
+SET v_valorTotal = v_valorUnitario * p_qtd;
+
+    
+/* CRIA O ALUGUEL */
+    
+INSERT INTO aluguel
+(
+idCliente,
+idFuncionario,
+dataHoraRetirada,
+valorApagar,
+valorPago,
+pago,
+formaPagamento
+)
+    
+VALUES
+(
+p_idCliente,
+p_idFuncionario,
+NOW(),
+v_valorTotal,
+ v_valorTotal,
+1,
+p_formaPagamento
+);
+
+    
+/* PEGA O IDD DO ALUGUEL */
+    
+SET v_idAluguel = LAST_INSERT_ID();
+
+    
+/* INSERE QUAL VAI SER O EQUIPAMENTO */
+    
+INSERT INTO aluguelequipamento
+(
+idEquipamento,
+idAluguel,
+valorItem,
+valorUnitario,
+qtd
+)
+    
+VALUES
+(
+p_idEquipamento,
+v_idAluguel,
+v_valorTotal,
+v_valorUnitario,
+p_qtd
+);
+
+    
+/* ATUALIZAA O ESTOQUE */
+    
+UPDATE equipamento
+SET qtd = qtd - p_qtd
+WHERE idEquipamento = p_idEquipamento;
+
+END $$
+
+DELIMITER ; -- DELIMITER SERVE PARA FALAR PRO SQL Q TERMNOU A PROCEUDRE $$
+
+
+/*TESTAR*/
+SELECT * FROM aluguel
+ORDER BY idAluguel DESC;
+
+
+CALL ps_CriarAluguel(6, 2, 3, 2, 'Pix');
+
+CALL ps_CriarAluguel(1, 3, 3, 2, 'Dinheiro');
+
+CALL ps_CriarAluguel(5, 2, 4, 3, 'Cartao');
+
+CALL ps_CriarAluguel(7, 3, 2, 2, 'Dinheiro');
