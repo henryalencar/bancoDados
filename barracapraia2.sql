@@ -934,12 +934,6 @@ CALL ps_QtdAluguelFormaPagamento('Dinheiro');
 
 
 
-
-/*DESAFIO - Automatizar o processo de locação de um equipamento 
-atualizando o estoque e tudo que for necessário através de uma procedure
-de criar aluguel*/
-
-
 DELIMITER $$
 
 CREATE PROCEDURE ps_CriarAluguel
