@@ -1039,3 +1039,59 @@ CALL ps_CriarAluguel(1, 3, 3, 2, 'Dinheiro');
 CALL ps_CriarAluguel(5, 2, 4, 3, 'Cartao');
 
 CALL ps_CriarAluguel(7, 3, 2, 2, 'Dinheiro');
+
+/* Transection */
+
+START TRANSACTION 
+
+INSERT INTO aluguel 
+
+(idCliente,idFuncionario,dataHoraRetirada,valorApagar,valorPago,pago,
+
+formaPagamento)
+
+VALUES
+
+(1,1,NOW(),10,0,0,null);
+ 
+INSERT INTO aluguelequipamento(
+
+idEquipamento,idAluguel,valorItem,valorUnitario,qtd)
+
+VALUES
+
+(1,LAST_INSERT_ID(),10,10,1);
+ 
+UPDATE equipamento
+
+SET qtd = qtd - 1
+
+WHERE idEquipamento = 1;
+
+COMMIT 
+
+ROLLBACK 
+
+SELECT * FROM aluguel
+SELECT * FROM equipamento
+SELECT * FROM aluguelequipamento
+ 
+
+/* Transection */
+
+INSERT INTO aluguel
+(idCliente,idFuncionario,dataHoraRetirada,valorApagar,valorPago,pago,
+formaPagamento)
+VALUES (1,1,NOW(),10,0,0,null);
+ 
+INSERT INTO aluguelequipamento(
+idEquipamento,idAluguel,valorItem,valorUnitario,qtd)
+VALUES
+(1,LAST_INSERT_ID(),10,10,1);
+ 
+UPDATE equipamento
+SET qtd = qtd - 1
+WHERE idEquipamento = 1;
+ 
+COMMIT 
+ROLLBACK 
